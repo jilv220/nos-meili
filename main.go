@@ -34,10 +34,9 @@ const NOSTR_EVENTS_INDEX = "nostr-events"
 
 func main() {
 	// init client
-	masterKey := "Qdy6nnc4AfLX-xkQbegSjG3LV6b8JhFuL0hnGjCrMr8"
   client := meilisearch.NewClient(meilisearch.ClientConfig{
     Host: "http://localhost:7700",
-    APIKey: masterKey,
+    // APIKey can be set later through /key endpoint
   })
 
 	// load stopwords
