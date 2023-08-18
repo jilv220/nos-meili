@@ -3,8 +3,6 @@ package lib
 import (
 	"context"
 	"fmt"
-	"runtime"
-	"sync"
 	"time"
 
 	"github.com/jilv220/nos-meili/constants"
@@ -33,7 +31,6 @@ var nostrRelays = []string {
 func IndexNewEvents(ctx context.Context, client *meilisearch.Client) {
 	filters := []nostr.Filter {{
 		Kinds: []int{1},
-		Limit: 200,
 	}}
 
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -49,52 +46,5 @@ func IndexNewEvents(ctx context.Context, client *meilisearch.Client) {
 		evs = append(evs, *ev)
 	}
 	fmt.Printf("Total events retrieved: %v\n", len(evs))
-
-	batchSize := len(evs) / (runtime.NumCPU() * 4)
-	fmt.Printf("Batch size: %v\n", batchSize)
-
-	batches := make([][]nostr.Event, 0, (len(evs) + batchSize - 1) / batchSize)
-	for batchSize < len(evs) {
-    evs, batches = evs[batchSize:], append(batches, evs[0:batchSize:batchSize])
-	}
-	batches = append(batches, evs)
-	fmt.Printf("Total chunks divided: %v\n", len(batches))
-
-	var wg sync.WaitGroup
-	for i, batch := range batches {
-  	wg.Add(1)
-  	go func(batch []nostr.Event, id int) {
-    	defer wg.Done()
-    	for _, ev := range batch {
-				client.Index(constants.NOSTR_EVENTS_INDEX).UpdateDocuments(ev)
-			}
-			fmt.Printf("Worker %v done\n", id)
-  	}(batch, i)
-	}
-	wg.Wait()
-}
-
-func IndexPastEvents(ctx context.Context, client *meilisearch.Client) {
-	var sec nostr.Timestamp
-	now := time.Now()
-	sec = nostr.Timestamp(now.Unix())
-	filters := []nostr.Filter {{
-		Kinds: []int{1},
-		Until: &sec,
-	}}
-
-	for {
-		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-
-		pool := nostr.NewSimplePool(ctx)
-		evChan := pool.SubManyEose(ctx, nostrRelays, filters)
-
-		fmt.Println("=== start indexing past events ... ===")
-		for ev := range evChan {
-			fmt.Printf("indexing event with id: %s\n", ev.ID)
-			client.Index(constants.NOSTR_EVENTS_INDEX).UpdateDocuments(ev)
-		}
-		time.Sleep(2 * time.Second)
-	}
+	client.Index(constants.NOSTR_EVENTS_INDEX).UpdateDocuments(evs)
 }
