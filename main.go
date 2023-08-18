@@ -3,35 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
-	"time"
 
+	"github.com/jilv220/nos-meili/constants"
+	"github.com/jilv220/nos-meili/lib"
 	"github.com/joho/godotenv"
 	"github.com/meilisearch/meilisearch-go"
-	"github.com/nbd-wtf/go-nostr"
 )
-
-var nostrRelays = []string {
-	"wss://nos.lol",
-	"wss://nostr.mom",
-	"wss://nostr.wine",
-	"wss://relay.nostr.com.au",
-	"wss://relay.shitforce.one/",
-	"wss://nostr.inosta.cc",
-	"wss://relay.primal.net",
-	"wss://relay.damus.io",
-	"wss://relay.nostr.band",
-	"wss://eden.nostr.land",
-	"wss://nostr.milou.lol",
-	"wss://relay.mostr.pub",
-	"wss://nostr-pub.wellorder.net",
-	"wss://atlas.nostr.land",
-	"wss://relay.snort.social",
-}
-
-const NOSTR_EVENTS_INDEX = "nostr-events"
 
 func main() {
 	// load dotenv
@@ -71,7 +50,7 @@ func main() {
 	
 	if len(res.Results) == 0 {
 		client.CreateIndex(&meilisearch.IndexConfig {
-			Uid: NOSTR_EVENTS_INDEX,
+			Uid: constants.NOSTR_EVENTS_INDEX,
 			PrimaryKey: "id",
 		})
 	}
@@ -108,26 +87,11 @@ func main() {
 			MaxTotalHits: 1000,
 		},
 	}
-	client.Index(NOSTR_EVENTS_INDEX).UpdateSettings(&settings)
+	client.Index(constants.NOSTR_EVENTS_INDEX).UpdateSettings(&settings)
 
 	ctx := context.Background()
-	filters := []nostr.Filter {{
-		Kinds: []int{1},
-	}}
-
 	for {
-		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-
-		pool := nostr.NewSimplePool(ctx)
-		evChan := pool.SubManyEose(ctx, nostrRelays, filters)
-
-		fmt.Println("=== start indexing... ===")
-		for ev := range evChan {
-			fmt.Printf("indexing event with id: %s\n", ev.ID)
-			client.Index(NOSTR_EVENTS_INDEX).UpdateDocuments(ev)
-		}
-		time.Sleep(2 * time.Second)
+		lib.IndexNewEvents(ctx, client)
 	}
 }
 
