@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/meilisearch/meilisearch-go"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -33,10 +34,18 @@ var nostrRelays = []string {
 const NOSTR_EVENTS_INDEX = "nostr-events"
 
 func main() {
+	// load dotenv
+	err := godotenv.Load()
+	if err != nil {
+		panic(err)
+	}
+	MEILI_HOST_URL := os.Getenv("MEILI_HOST_URL")
+	MEILI_ADMIN_API_KEY := os.Getenv("MEILI_ADMIN_API_KEY")
+
 	// init client
   client := meilisearch.NewClient(meilisearch.ClientConfig{
-    Host: "http://localhost:7700",
-    // APIKey can be set later through /key endpoint
+    Host: MEILI_HOST_URL,
+		APIKey: MEILI_ADMIN_API_KEY,
   })
 
 	// load stopwords
@@ -53,9 +62,12 @@ func main() {
 	}
 
 	// create index for nostr events
-	res, _ := client.GetIndexes(&meilisearch.IndexesQuery{
+	res, err := client.GetIndexes(&meilisearch.IndexesQuery{
 		Limit: 1,
 	})
+	if err != nil {
+		panic(nil)
+	}
 	
 	if len(res.Results) == 0 {
 		client.CreateIndex(&meilisearch.IndexConfig {
@@ -103,18 +115,19 @@ func main() {
 		Kinds: []int{1},
 	}}
 
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	pool := nostr.NewSimplePool(ctx)
-
 	for {
-		fmt.Println("indexing...")
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+
+		pool := nostr.NewSimplePool(ctx)
 		evChan := pool.SubManyEose(ctx, nostrRelays, filters)
+
+		fmt.Println("=== start indexing... ===")
 		for ev := range evChan {
+			fmt.Printf("indexing event with id: %s\n", ev.ID)
 			client.Index(NOSTR_EVENTS_INDEX).UpdateDocuments(ev)
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
