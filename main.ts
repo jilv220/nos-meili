@@ -1,7 +1,6 @@
 import { load } from "https://deno.land/std@0.198.0/dotenv/mod.ts";
 import { MeiliSearch } from "https://esm.sh/meilisearch@0.34.1";
-import { SimplePool } from "https://dev.jspm.io/npm:nostr-tools@1.14.0";
-import { Filter } from "npm:nostr-tools@^1.14.0";
+import { type Filter, type Event, SimplePool, Kind } from "npm:nostr-tools@^1.14.0";
 
 import stopwords from "./stopwords-all.json" assert { type: "json" };
 
@@ -74,12 +73,14 @@ const nostrRelays = [
 ];
 
 const filter: Filter = {
-  kinds: [1]
+  kinds: [1],
+  // memory usage keeps going larger if a limit is not set, but why??
+  limit: 200
 }
 
 while (true) {
   const pool = new SimplePool()
-  const evs = await pool.list(nostrRelays, [filter], undefined)
-  client.index(NOSTR_EVENTS_INDEX).addDocuments(evs as Record<string, Event>[])
+  const evs = await pool.list(nostrRelays, [filter])
+  client.index(NOSTR_EVENTS_INDEX).addDocuments(evs)
   pool.close(nostrRelays)
 }
