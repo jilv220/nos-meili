@@ -1,8 +1,11 @@
-import { load } from "https://deno.land/std@0.198.0/dotenv/mod.ts";
+import { getQuery } from "https://deno.land/x/oak@v12.6.0/helpers.ts";
+import { Application, Router } from "https://deno.land/x/oak@v12.6.0/mod.ts";
+import { searchSchema } from "./schemas/nostr.ts";
+import { load } from "std/dotenv/mod.ts";
 import { MeiliSearch } from "https://esm.sh/meilisearch@0.34.1";
-import { type Filter, type Event, SimplePool, Kind } from "npm:nostr-tools@^1.14.0";
 
-import stopwords from "./stopwords-all.json" assert { type: "json" };
+// indexing worker
+new Worker(new URL("./indexing.ts", import.meta.url).href, { type: "module" });
 
 const NOSTR_EVENTS_INDEX = "nostr-events";
 
@@ -15,72 +18,32 @@ const client = new MeiliSearch({
   apiKey: MEILI_ADMIN_API_KEY,
 });
 
-let stopwordsArr: string[] = [];
-for (const [_, value] of Object.entries(stopwords)) {
-  stopwordsArr = [...stopwordsArr, ...value];
-}
+const router = new Router();
+router
+  .get("/", (ctx) => {
+    ctx.response.body = "Hello world!";
+  })
+  .get("/search", async (ctx) => {
+    const query = getQuery(ctx, { mergeParams: true });
 
-const indexes = await client.getIndexes({ limit: 3 });
+    let parsedQuery;
+    try {
+      parsedQuery = searchSchema.parse(query)
+    } catch (err) {
+      console.error(err)
+    }
+    const res = await client.index(NOSTR_EVENTS_INDEX).search(parsedQuery?.query, {
+      filter: `kind=${parsedQuery?.kind}`,
+      offset: parsedQuery?.offset,
+      limit: parsedQuery?.limit
+    })
+    ctx.response.body = {
+      data: res.hits
+    };
+  })
 
-if (indexes.results.length == 0) {
-  client.createIndex(NOSTR_EVENTS_INDEX, { primaryKey: "id" });
-}
+const app = new Application();
+app.use(router.routes());
+app.use(router.allowedMethods());
 
-client.index(NOSTR_EVENTS_INDEX).updateSettings({
-  searchableAttributes: [
-    "content",
-  ],
-  displayedAttributes: [
-    "content",
-    "created_at",
-    "id",
-    "kind",
-    "pubkey",
-    "sig",
-    "tags",
-  ],
-  filterableAttributes: [
-    "kind",
-  ],
-  sortableAttributes: [
-    "created_at",
-  ],
-  stopWords: stopwordsArr,
-  typoTolerance: {
-    minWordSizeForTypos: {
-      oneTypo: 5,
-      twoTypos: 10,
-    },
-  },
-});
-
-const nostrRelays = [
-  "wss://nos.lol",
-  "wss://nostr.mom",
-  "wss://nostr.wine",
-  "wss://relay.nostr.com.au",
-  "wss://relay.shitforce.one/",
-  "wss://nostr.inosta.cc",
-  "wss://relay.primal.net",
-  "wss://relay.damus.io",
-  "wss://relay.nostr.band",
-  "wss://eden.nostr.land",
-  "wss://nostr.milou.lol",
-  "wss://relay.mostr.pub",
-  "wss://nostr-pub.wellorder.net",
-  "wss://atlas.nostr.land",
-  "wss://relay.snort.social",
-];
-
-const filter: Filter = {
-  kinds: [1],
-  // memory usage keeps going larger if a limit is not set, but why??
-  limit: 200
-}
-
-while (true) {
-  const pool = new SimplePool()
-  const evs = await pool.list(nostrRelays, [filter])
-  client.index(NOSTR_EVENTS_INDEX).addDocuments(evs)
-  pool.close(nostrRelays)
-}
+await app.listen({ port: 8000 });
