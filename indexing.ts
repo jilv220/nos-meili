@@ -1,10 +1,16 @@
 import { MeiliSearch } from "https://esm.sh/meilisearch@0.34.1";
-import { type Filter, type Event, SimplePool, Kind } from "npm:nostr-tools@^1.14.0";
+import {
+  type Event,
+  type Filter,
+  Kind,
+  SimplePool,
+} from "npm:nostr-tools@^1.14.0";
 
 import stopwords from "./stopwords-all.json" assert { type: "json" };
 import { load } from "std/dotenv/mod.ts";
+import { printContents, unindexable } from "./util.ts";
 
-console.log("indexing worker started")
+console.log("indexing worker started");
 
 const NOSTR_EVENTS_INDEX = "nostr-events";
 
@@ -78,12 +84,13 @@ const filter: Filter = {
   // seems the onlyone making sense is kind 0 and 1?
   kinds: [0, 1],
   // memory usage keeps going larger if a limit is not set, but why??
-  limit: 200
-}
+  limit: 200,
+};
 
 while (true) {
-  const pool = new SimplePool()
-  const evs = await pool.list(nostrRelays, [filter])
-  client.index(NOSTR_EVENTS_INDEX).addDocuments(evs)
-  pool.close(nostrRelays)
+  const pool = new SimplePool();
+  const evs = await pool.list(nostrRelays, [filter]);
+  const indexables = evs.filter((ev) => !unindexable(ev));
+  client.index(NOSTR_EVENTS_INDEX).addDocuments(indexables);
+  pool.close(nostrRelays);
 }

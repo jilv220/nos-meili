@@ -28,19 +28,22 @@ router
 
     let parsedQuery;
     try {
-      parsedQuery = searchSchema.parse(query)
+      parsedQuery = searchSchema.parse(query);
     } catch (err) {
-      console.error(err)
+      console.error(err);
     }
-    const res = await client.index(NOSTR_EVENTS_INDEX).search(parsedQuery?.query, {
-      filter: `kind=${parsedQuery?.kind}`,
-      offset: parsedQuery?.offset,
-      limit: parsedQuery?.limit
-    })
+    const res = await client.index(NOSTR_EVENTS_INDEX).search(
+      parsedQuery?.query,
+      {
+        filter: `kind=${parsedQuery?.kind}`,
+        offset: parsedQuery?.offset,
+        limit: parsedQuery?.limit,
+      },
+    );
     ctx.response.body = {
-      data: res.hits
+      data: res.hits,
     };
-  })
+  });
 
 const app = new Application();
 app.use(router.routes());
