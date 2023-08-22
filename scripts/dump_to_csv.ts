@@ -6,6 +6,7 @@ import {
   Kind,
   SimplePool,
 } from "npm:nostr-tools@^1.14.0";
+import { isSpam, removeURL, unindexable } from "../util.ts";
 
 const EVS_LENGTH_CAP = "5000";
 
@@ -46,7 +47,13 @@ while (evs.length < Number(flags.count)) {
   pool.close(nostrRelays);
 }
 
-const csv = stringify(evs, {
+// Need to filter spam&unindexable...
+const indexables = evs
+  .filter((ev) => !unindexable(ev))
+  .filter((ev) => !isSpam(ev))
+  .map((ev) => removeURL(ev));
+
+const csv = stringify(indexables, {
   columns: [
     "content",
   ],
