@@ -4,6 +4,7 @@
   },
   "tasks": {
     "dev": "deno run --allow-read=./ --allow-env --allow-net --watch main.ts",
-    "start": "deno run --allow-read=./ --allow-env --allow-net main.ts"
+    "start": "deno run --allow-read=./ --allow-env --allow-net main.ts",
+    "dump": "deno run --allow-net --allow-write scripts/dump_to_csv.ts"
   }
 }
