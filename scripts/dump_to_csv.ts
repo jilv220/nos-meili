@@ -8,11 +8,11 @@ import {
 } from "npm:nostr-tools@^1.14.0";
 import { isSpam, removeDup, removeURL, unindexable } from "../util.ts";
 
-const EVS_LENGTH_CAP = "5000";
+const ONE_HOUR = 60 * 60 * 1000;
 
 const flags = parse(Deno.args, {
-  string: ["count"],
-  default: { count: EVS_LENGTH_CAP },
+  string: ["hour"],
+  default: { hour: "24" },
 });
 
 const nostrRelays = [
@@ -31,24 +31,45 @@ const nostrRelays = [
   "wss://nostr-pub.wellorder.net",
   "wss://atlas.nostr.land",
   "wss://relay.snort.social",
+  "wss://nostr.klabo.blog",
+  "wss://nostrue.com",
+  "wss://nostr.vulpem.com",
 ];
+
+const sinceTime = Math.floor(
+  (Date.now() - Number(flags.hour) * ONE_HOUR) / 1000,
+);
 
 const filter: Filter = {
   kinds: [1],
-  // memory usage keeps going larger if a limit is not set, but why??
-  limit: 200,
+  since: sinceTime,
+  limit: 1000,
 };
 
 let evs: Event<Kind>[] = [];
 
-while (evs.length < Number(flags.count)) {
+let evsLengthRecord = 0;
+let diff = 9999;
+let zeroCount = 0;
+
+// Best effort, impossible to trace back
+while (zeroCount <= 10) {
+  evsLengthRecord = evs.length;
   const pool = new SimplePool();
   evs = [...evs, ...await pool.list(nostrRelays, [filter])];
+  evs = removeDup(evs);
+
+  diff = evs.length - evsLengthRecord;
+  console.log(`New events retrieved: ${diff}`);
+
+  if (diff === 0) {
+    zeroCount++;
+  }
   pool.close(nostrRelays);
 }
 
-// Need to filter spam&unindexable...
-const indexables = removeDup(evs)
+// Need to filter spam & unindexable...
+const indexables = evs
   .filter((ev) => !unindexable(ev))
   .filter((ev) => !isSpam(ev))
   .map((ev) => removeURL(ev))
