@@ -17,6 +17,7 @@ const EXCLUDE_WORDS = [
   "腾讯游戏部",
   "大中华区第9群",
   "腾讯产品分享会",
+  "为您提供安全可靠的软件开发",
 ];
 
 export function unindexable(ev: Event<Kind>) {
@@ -59,6 +60,15 @@ export function removeURL(ev: Event<Kind>): Event<Kind> {
   const contentMerged = concatStringArr(contentMergedBySpace, "\n");
   ev.content = contentMerged;
   return ev;
+}
+
+export function removeDup(evs: Event<Kind>[]): Event<Kind>[] {
+  const map = new Map<string, Event<Kind>>();
+  for (const ev of evs) {
+    map.set(ev.content, ev);
+  }
+  const iteratorValues = map.values();
+  return [...iteratorValues];
 }
 
 export function concatStringArr(strArr: string[], delimiter: string): string {

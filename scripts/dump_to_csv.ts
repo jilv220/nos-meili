@@ -6,7 +6,7 @@ import {
   Kind,
   SimplePool,
 } from "npm:nostr-tools@^1.14.0";
-import { isSpam, removeURL, unindexable } from "../util.ts";
+import { isSpam, removeDup, removeURL, unindexable } from "../util.ts";
 
 const EVS_LENGTH_CAP = "5000";
 
@@ -48,10 +48,12 @@ while (evs.length < Number(flags.count)) {
 }
 
 // Need to filter spam&unindexable...
-const indexables = evs
+const indexables = removeDup(evs)
   .filter((ev) => !unindexable(ev))
   .filter((ev) => !isSpam(ev))
-  .map((ev) => removeURL(ev));
+  .map((ev) => removeURL(ev))
+  // remove short content because of low c-tf-idf
+  .filter((ev) => ev.content.length > 2);
 
 const csv = stringify(indexables, {
   columns: [
@@ -64,4 +66,6 @@ try {
 } catch {
   console.log("data dir already existed, skip creating...");
 }
-await Deno.writeTextFile("./nostr_data/dump.csv", csv);
+
+const timestamp = Date.now();
+await Deno.writeTextFile(`./nostr_data/dump_${timestamp}.csv`, csv);
